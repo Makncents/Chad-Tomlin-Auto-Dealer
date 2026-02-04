@@ -1,0 +1,37 @@
+# AI Wealth Management Project Requirements
+# Install with: pip install --no-cache-dir -r requirements.txt
+
+# Core utilities
+python-dotenv>=1.0.0
+requests>=2.31.0
+beautifulsoup4>=4.12.0
+
+# Data processing
+pandas>=2.0.0
+
+# AI/ML packages
+openai>=1.0.0
+
+# Vector databases
+pinecone-client>=3.0.0
+pymilvus>=2.3.0
+
+# NLP and transformers
+sentence-transformers>=2.2.0
+transformers>=4.30.0
+
+# PyTorch - CPU version (much smaller than GPU version)
+# Remove the --index-url line below if you need GPU support
+--index-url https://download.pytorch.org/whl/cpu
+torch>=2.0.0
+
+# Optional: Add these if needed
+# torchvision>=0.15.0
+# torchaudio>=2.0.0
+
+# Development tools (optional)
+# pytest>=7.0.0
+# black>=23.0.0
+# flake8>=6.0.0
+# ipython>=8.0.0
+# jupyter>=1.0.0
