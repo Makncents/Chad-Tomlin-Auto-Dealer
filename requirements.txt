@@ -1,0 +1,10 @@
+python-dotenv
+openai
+pinecone-client
+pymilvus
+sentence-transformers
+transformers
+beautifulsoup4
+requests
+pandas
+torch

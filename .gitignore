@@ -1,0 +1,13 @@
+# Python cache
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+
+# Virtual environments
+ai_wealth/
+.venv/
+
+# Local temp/cache
+.tmp/
+.pytest_cache/

@@ -1,0 +1,7 @@
+python-dotenv
+openai
+pinecone-client
+pymilvus
+beautifulsoup4
+requests
+pandas
