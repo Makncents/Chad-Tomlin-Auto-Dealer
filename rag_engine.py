@@ -3,6 +3,7 @@ import os
 from dotenv import load_dotenv
 
 from pinecone_db import query_embeddings  # or milvus_db
+from task_executor import execute_task
 
 load_dotenv()
 
@@ -50,11 +51,20 @@ def rag_query(user_query, model="gpt-3.5-turbo"):
             messages=[{"role": "user", "content": prompt}],
             temperature=0.3,  # Lower = more factual
         )
-        return response.choices[0].message.content
+    else:
+        response = client.ChatCompletion.create(
+            model=model,
+            messages=[{"role": "user", "content": prompt}],
+            temperature=0.3,  # Lower = more factual
+        )
 
-    response = client.ChatCompletion.create(
-        model=model,
-        messages=[{"role": "user", "content": prompt}],
-        temperature=0.3,  # Lower = more factual
-    )
+    # ADD THIS: If the AI should execute a task
+    if any(
+        keyword in user_query.lower()
+        for keyword in ["buy", "scrape", "send email", "execute"]
+    ):
+        task_instruction = user_query
+        result = execute_task(task_instruction)
+        return f"Action Executed!\n\n{result}"
+
     return response.choices[0].message.content
