@@ -1,0 +1,327 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ============ VEHICLES ============
+// Year-Make-Model (YMM) database
+model Year {
+  id        String   @id @default(cuid())
+  year      Int      @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  makes Makes[]
+
+  @@index([year])
+}
+
+model Make {
+  id        String   @id @default(cuid())
+  name      String   // Ford, Chevrolet, Toyota, etc.
+  yearId    String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  year   Year     @relation(fields: [yearId], references: [id], onDelete: Cascade)
+  models Models[]
+
+  @@unique([yearId, name])
+  @@index([yearId])
+}
+
+model Models {
+  id        String   @id @default(cuid())
+  name      String   // F-150, Silverado, Camry, etc.
+  makeId    String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  make       Make         @relation(fields: [makeId], references: [id], onDelete: Cascade)
+  submodels  Submodel[]
+  fitments   Fitment[]
+
+  @@unique([makeId, name])
+  @@index([makeId])
+}
+
+model Submodel {
+  id        String   @id @default(cuid())
+  name      String   // SuperCrew, Crew Cab, Extended Cab, etc.
+  modelId   String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  model     Models    @relation(fields: [modelId], references: [id], onDelete: Cascade)
+  bodyStyles BodyStyle[]
+
+  @@unique([modelId, name])
+  @@index([modelId])
+}
+
+model BodyStyle {
+  id        String   @id @default(cuid())
+  name      String   // Pickup, Sedan, SUV, etc.
+  submodelId String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  submodel  Submodel  @relation(fields: [submodelId], references: [id], onDelete: Cascade)
+  fitments  Fitment[]
+
+  @@unique([submodelId, name])
+  @@index([submodelId])
+}
+
+// ============ PRODUCTS ============
+model Product {
+  id              String   @id @default(cuid())
+  sku             String   @unique
+  name            String   // "Custom Fit Seat Covers"
+  description     String?  @db.Text
+  category        String   // "seat-covers", "car-cover", "floor-mats"
+  wholesalePrice  Float    // Cost from supplier
+  retailPrice     Float    // MSRP / base retail price
+  profitMargin    Float    @default(0.35) // 35-50% target
+  materials       String[] // ["Neosupreme", "Leatherette", "Canvas"]
+  colors          String[] // ["Black", "Gray", "Tan"]
+  images          String[] // Array of image URLs
+  inStock         Boolean  @default(false)
+  stockLevel      Int      @default(0)
+  shipsInDays     Int      @default(7) // Default: 7-12 days (made-to-order)
+  speedArbitrage  Boolean  @default(false) // True if in-stock with 1-2 day shipping
+  speedPremium    Float    @default(0.10) // 10% speed arbitrage markup
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  fitments      Fitment[]
+  suppliers     ProductSupplier[]
+  cartItems     CartItem[]
+  orderItems    OrderItem[]
+
+  @@index([category])
+  @@index([inStock])
+  @@index([speedArbitrage])
+}
+
+// ============ FITMENTS ============
+// Maps products to vehicles (YMM + Submodel + BodyStyle)
+model Fitment {
+  id           String   @id @default(cuid())
+  productId    String
+  modelId      String
+  bodyStyleId  String
+  submodelId   String   @default("")
+  supplierSku  String   // Supplier's SKU for this fitment
+  notes        String?  @db.Text // "Front bucket seats only", etc.
+  guaranteed   Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  product      Product   @relation(fields: [productId], references: [id], onDelete: Cascade)
+  model        Models    @relation(fields: [modelId], references: [id])
+  bodyStyle    BodyStyle @relation(fields: [bodyStyleId], references: [id])
+
+  @@unique([productId, modelId, bodyStyleId])
+  @@index([productId])
+  @@index([modelId])
+  @@index([bodyStyleId])
+  @@index([supplierSku])
+}
+
+// ============ SUPPLIERS ============
+model Supplier {
+  id              String   @id @default(cuid())
+  name            String   @unique // "Covercraft", "Coverking"
+  apiKey          String?  @db.VarChar(500) // Encrypted
+  apiEndpoint     String?
+  ediEndpoint     String?
+  vendorId        String?
+  contactEmail    String?
+  contactPhone    String?
+  leadTimeDays    Int      @default(7) // Default production time
+  shippingDays    Int      @default(3) // Default shipping time
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  products        ProductSupplier[]
+  orders          SupplierOrder[]
+
+  @@index([name])
+}
+
+model ProductSupplier {
+  id            String   @id @default(cuid())
+  productId     String
+  supplierId    String
+  supplierSku   String   // Supplier's internal SKU
+  supplierName  String   // Product name from supplier
+  costPrice     Float    // Wholesale cost
+  msrp          Float?   // Manufacturer suggested retail price
+  inStock       Boolean  @default(false)
+  stockLevel    Int      @default(0)
+  lastSyncAt    DateTime?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  product       Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  supplier      Supplier @relation(fields: [supplierId], references: [id], onDelete: Cascade)
+
+  @@unique([productId, supplierId])
+  @@index([productId])
+  @@index([supplierId])
+  @@index([inStock])
+}
+
+// ============ ORDERS ============
+model Order {
+  id                String   @id @default(cuid())
+  orderNumber       String   @unique @default(cuid())
+  customerId        String
+  status            String   @default("pending") // pending, processing, shipped, delivered
+  selectedVehicle   String?  // Vehicle selection (JSON string or reference)
+  subtotal          Float
+  tax               Float    @default(0)
+  shipping          Float    @default(0)
+  localInstall      Float    @default(0) // $80 add-on for local installation
+  total             Float
+  paymentMethod     String?  // stripe, apple-pay, google-pay
+  paymentIntentId   String?  // Stripe payment intent ID
+  shippingAddress   String   @db.Text // JSON address
+  installationDate  DateTime? // Scheduled installation date
+  trackingNumber    String?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  shippedAt         DateTime?
+  deliveredAt       DateTime?
+
+  items             OrderItem[]
+  supplierOrders    SupplierOrder[]
+
+  @@index([customerId])
+  @@index([status])
+  @@index([createdAt])
+}
+
+model OrderItem {
+  id        String   @id @default(cuid())
+  orderId   String
+  productId String
+  quantity  Int      @default(1)
+  unitPrice Float
+  total     Float
+  createdAt DateTime @default(now())
+
+  order     Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  product   Product  @relation(fields: [productId], references: [id])
+
+  @@index([orderId])
+  @@index([productId])
+}
+
+// ============ SUPPLIER ORDERS ============
+// Wholesale orders routed to suppliers via EDI/CSV
+model SupplierOrder {
+  id              String   @id @default(cuid())
+  orderId         String
+  supplierId      String
+  ediFileName     String?  // Exported EDI filename
+  supplierOrderId String?  // Supplier's PO number
+  status          String   @default("pending") // pending, sent, received, shipped
+  quantity        Int
+  wholesaleCost   Float
+  totalCost       Float
+  sentAt          DateTime?
+  confirmedAt     DateTime?
+  shippedAt       DateTime?
+  trackingNumber  String?
+  notes           String?  @db.Text
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  order           Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  supplier        Supplier @relation(fields: [supplierId], references: [id])
+
+  @@unique([orderId, supplierId])
+  @@index([orderId])
+  @@index([supplierId])
+  @@index([status])
+}
+
+// ============ CART ============
+model Cart {
+  id        String   @id @default(cuid())
+  customerId String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  items     CartItem[]
+
+  @@unique([customerId])
+}
+
+model CartItem {
+  id        String   @id @default(cuid())
+  cartId    String
+  productId String
+  quantity  Int      @default(1)
+  addedAt   DateTime @default(now())
+
+  cart      Cart     @relation(fields: [cartId], references: [id], onDelete: Cascade)
+  product   Product  @relation(fields: [productId], references: [id])
+
+  @@unique([cartId, productId])
+}
+
+// ============ INVENTORY SYNC ============
+// Webhook logs for supplier inventory updates
+model InventorySync {
+  id            String   @id @default(cuid())
+  supplierId    String
+  syncType      String   // "webhook", "scheduled", "manual"
+  payload       String   @db.Text // Raw JSON from supplier
+  status        String   @default("processing") // processing, success, failed
+  processedAt   DateTime?
+  errorMessage  String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([supplierId])
+  @@index([status])
+  @@index([createdAt])
+}
+
+// ============ SEO ============
+// Dynamic SEO landing pages for YMM combinations
+model SeoPage {
+  id            String   @id @default(cuid())
+  slug          String   @unique // /custom-seat-covers/ford/f-150/2021
+  title         String   // "Custom Fit 2021 Ford F-150 Seat Covers | Guaranteed Fit"
+  metaDesc      String   // Meta description
+  h1            String   // H1 heading
+  content       String   @db.Text // Long-form content
+  faqJson       String   @db.Text // JSON array of FAQs
+  schemaJson    String   @db.Text // JSON-LD structured data
+  category      String   // "seat-covers", "car-covers", etc.
+  year          Int?
+  make          String?
+  model         String?
+  views         Int      @default(0)
+  conversions   Int      @default(0)
+  lastGeneratedAt DateTime?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([slug])
+  @@index([category])
+  @@index([year])
+  @@index([make])
+  @@index([model])
+}

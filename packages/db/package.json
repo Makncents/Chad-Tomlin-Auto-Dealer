@@ -1,0 +1,19 @@
+{
+  "name": "@carcover/db",
+  "version": "0.0.1",
+  "description": "Prisma database schema & migrations",
+  "private": true,
+  "scripts": {
+    "db:migrate": "prisma migrate dev",
+    "db:studio": "prisma studio",
+    "db:seed": "node prisma/seed.js",
+    "db:push": "prisma db push",
+    "generate": "prisma generate"
+  },
+  "dependencies": {
+    "@prisma/client": "^5.7.1"
+  },
+  "devDependencies": {
+    "prisma": "^5.7.1"
+  }
+}
